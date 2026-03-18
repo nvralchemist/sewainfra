@@ -4,9 +4,11 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 
 const initialSeconds = 28 * 60 + 14
+const paymentMethods = ['QRIS', 'GoPay', 'VA BCA']
+const fakeLink = 'sewain.id/pay/SNY-A7-BOOK-2941'
 
 export default function Page() {
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
   const [phone, setPhone] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('QRIS')
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds)
@@ -33,7 +35,7 @@ export default function Page() {
   }
 
   const resetFlow = () => {
-    setStep(1)
+    setStep(0)
     setPhone('')
     setPaymentMethod('QRIS')
     setSecondsLeft(initialSeconds)
@@ -50,23 +52,24 @@ export default function Page() {
               </p>
               <div className="space-y-3">
                 <h1 className="max-w-md text-5xl font-semibold leading-tight">
-                  Checkout rasa real buat booking dari WhatsApp.
+                  Dari chat seller ke secure checkout, dalam satu prototype.
                 </h1>
                 <p className="max-w-md text-base leading-7 text-brand-ink/72">
-                  Satu halaman, tanpa backend, cukup realistis untuk demo Vercel:
-                  booking detail, hold timer, dan pilihan pembayaran dummy.
+                  Entry point sekarang dimulai dari percakapan WhatsApp yang terasa
+                  natural, lalu user masuk ke halaman pembayaran booking yang tetap
+                  ringan dan dummy.
                 </p>
               </div>
             </div>
 
             <div className="grid gap-3 text-sm text-brand-ink/78">
               <div className="rounded-3xl border border-brand-moss/10 bg-white/75 p-4">
-                Status booking dibuat terasa aman dengan summary, aturan singkat,
-                dan countdown pembayaran.
+                Seller mengirim detail stok, hold window, dan secure link langsung
+                dari chat.
               </div>
               <div className="rounded-3xl border border-brand-moss/10 bg-white/75 p-4">
-                Semua data bersifat fake, jadi cocok untuk prototype investor,
-                internal demo, atau testing UX.
+                Sesudah klik link, user masuk ke flow booking confirmation,
+                nomor WhatsApp, dan payment hold timer.
               </div>
             </div>
           </div>
@@ -77,17 +80,97 @@ export default function Page() {
                 <p className="text-[11px] uppercase tracking-[0.3em] text-brand-moss/70">
                   Sewain Demo
                 </p>
-                <h2 className="mt-1 text-xl font-semibold">
-                  WhatsApp booking checkout
-                </h2>
+                <h2 className="mt-1 text-xl font-semibold">WhatsApp to checkout</h2>
               </div>
               <div className="rounded-full bg-brand-sand px-3 py-1 text-xs font-medium text-brand-ink/65">
-                Step {step}/4
+                {step === 0 ? 'Chat' : `Step ${step}/4`}
               </div>
             </div>
 
+            {step === 0 && (
+              <div className="space-y-4 bg-[#e7ded0] p-5 sm:p-6">
+                <div className="rounded-[1.75rem] bg-[#efe7db] p-3">
+                  <div className="flex items-center gap-3 rounded-[1.25rem] bg-[#0b5f4f] px-4 py-3 text-white">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-sm font-semibold">
+                      SR
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">Sewain Rentals</p>
+                      <p className="text-xs text-white/75">
+                        online • biasanya balas dalam 3 menit
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 px-1 py-4 text-sm">
+                    <p className="mx-auto w-fit rounded-full bg-white/70 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-brand-ink/55">
+                      Today
+                    </p>
+
+                    <div className="flex justify-end">
+                      <div className="max-w-[82%] rounded-[1.25rem] rounded-br-md bg-[#dcf8c6] px-4 py-3 text-brand-ink shadow-sm">
+                        Halo kak, Sony A7 III buat 12-14 March masih available?
+                        Lokasi saya di Jakarta Selatan.
+                      </div>
+                    </div>
+
+                    <div className="flex justify-start">
+                      <div className="max-w-[84%] rounded-[1.25rem] rounded-bl-md bg-white px-4 py-3 text-brand-ink shadow-sm">
+                        Masih available kak. Untuk amankan tanggal, booking bisa di-hold
+                        dulu dengan deposit Rp20.000.
+                      </div>
+                    </div>
+
+                    <div className="flex justify-start">
+                      <div className="max-w-[84%] rounded-[1.25rem] rounded-bl-md bg-white px-4 py-3 text-brand-ink shadow-sm">
+                        Saya kirim secure checkout link ya. Setelah bayar deposit,
+                        slot langsung kami lock supaya tidak diambil penyewa lain.
+                      </div>
+                    </div>
+
+                    <div className="flex justify-start">
+                      <div className="max-w-[88%] rounded-[1.5rem] rounded-bl-md bg-white p-3 shadow-sm">
+                        <div className="rounded-[1.2rem] border border-brand-moss/15 bg-brand-sand/55 p-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-brand-moss/60">
+                            Secure booking link
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-brand-ink">
+                            Hold Sony A7 III for 12-14 March
+                          </p>
+                          <p className="mt-1 text-xs text-brand-ink/55">
+                            Expires in 30 min after opened
+                          </p>
+                          <div className="mt-3 rounded-xl bg-white px-3 py-2 text-xs text-brand-moss shadow-sm">
+                            {fakeLink}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setStep(1)}
+                          className="mt-3 w-full rounded-[1.1rem] bg-brand-moss py-3 text-sm font-medium text-white transition hover:bg-brand-leaf"
+                        >
+                          Buka secure checkout
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <div className="max-w-[78%] rounded-[1.25rem] rounded-br-md bg-[#dcf8c6] px-4 py-3 text-brand-ink shadow-sm">
+                        Oke, saya amankan sekarang.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {step === 1 && (
               <div className="space-y-5 p-5 sm:p-6">
+                <div className="rounded-[1.3rem] border border-brand-moss/12 bg-brand-sand/65 p-4 text-sm text-brand-ink/72">
+                  Link ini dikirim seller via WhatsApp untuk hold tanggal booking
+                  selama 30 menit.
+                </div>
+
                 <div className="relative aspect-[16/10] overflow-hidden rounded-[1.5rem]">
                   <Image
                     src="/camera.svg"
@@ -177,7 +260,7 @@ export default function Page() {
                     Expired dalam {formatTime(secondsLeft)}
                   </p>
                   <div className="mt-3 space-y-2">
-                    {['QRIS', 'GoPay', 'VA BCA'].map((method) => (
+                    {paymentMethods.map((method) => (
                       <button
                         key={method}
                         onClick={() => setPaymentMethod(method)}
@@ -234,7 +317,7 @@ export default function Page() {
                   onClick={resetFlow}
                   className="w-full rounded-[1.4rem] bg-brand-moss py-3.5 font-medium text-white transition hover:bg-brand-leaf"
                 >
-                  Kembali ke WhatsApp
+                  Kembali ke chat WhatsApp
                 </button>
               </div>
             )}
