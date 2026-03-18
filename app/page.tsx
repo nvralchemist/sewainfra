@@ -1,5 +1,5 @@
 'use client'
-/*starts here*/
+/*starts heres*/
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 
