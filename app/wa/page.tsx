@@ -1,34 +1,51 @@
-import Link from 'next/link'
+'use client'
 
-import { WhatsAppJourney } from '@/components/whatsapp-journey'
+import { useState } from 'react'
+import { WAChat } from '@/components/wa-chat'
+import { WASupport } from '@/components/wa-support'
+import { WAQuickSend } from '@/components/wa-quick-send'
 
-export default function WhatsAppJourneyPage() {
+const tabs = [
+  { id: '1a', label: '1A Chat Flow' },
+  { id: '1b', label: '1B Support' },
+  { id: '1c', label: '1C Quick Send' },
+] as const
+
+type TabId = (typeof tabs)[number]['id']
+
+export default function WAPage() {
+  const [activeTab, setActiveTab] = useState<TabId>('1a')
+
   return (
-    <main className="min-h-screen bg-brand-sand bg-grain px-4 py-8 text-brand-ink sm:py-12">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-card backdrop-blur">
-          <p className="text-xs uppercase tracking-[0.3em] text-brand-moss/70">WhatsApp Journey</p>
-          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold">Illustration screens</h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-brand-ink/68">
-                Simulasi bagaimana Sewain tetap membiarkan WhatsApp menjadi kanal
-                utama komunikasi, sambil menambah lapisan checkout, reminder, dan
-                dukungan dispute.
-              </p>
-            </div>
-            <div className="flex gap-3 text-sm">
-              <Link href="/" className="rounded-full border border-brand-ink/10 px-4 py-2 hover:bg-brand-sand">
-                Landing page
-              </Link>
-              <Link href="/b/demo001" className="rounded-full bg-brand-moss px-4 py-2 text-white">
-                Lihat customer flow
-              </Link>
-            </div>
-          </div>
-        </header>
+    <main className="min-h-screen bg-gray-100 py-6 px-4">
+      <div className="max-w-[420px] mx-auto space-y-4">
+        {/* Title */}
+        <div className="text-center">
+          <h1 className="text-lg font-semibold text-gray-900">WhatsApp Prototype</h1>
+          <p className="text-sm text-gray-500 mt-1">Simulasi pengalaman WhatsApp Sewain</p>
+        </div>
 
-        <WhatsAppJourney />
+        {/* Tab navigation */}
+        <div className="flex bg-white rounded-xl p-1 shadow-sm border border-gray-200">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 text-xs font-medium py-2.5 rounded-lg transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-sewain-primary text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Active screen */}
+        {activeTab === '1a' && <WAChat />}
+        {activeTab === '1b' && <WASupport />}
+        {activeTab === '1c' && <WAQuickSend />}
       </div>
     </main>
   )

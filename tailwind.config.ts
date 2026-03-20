@@ -8,23 +8,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          ink: '#122117',
-          moss: '#1d6a43',
-          leaf: '#2f9b5f',
-          sand: '#f2efe7',
-          clay: '#c96f42',
+        sewain: {
+          primary: '#1D9E75',
+          'primary-light': '#E1F5EE',
+          'primary-dark': '#0F6E56',
+          amber: '#EF9F27',
+          red: '#E24B4A',
+          'text-primary': '#1a1a1a',
+          'text-secondary': '#6b7280',
+          border: '#e5e7eb',
+          bg: '#f9fafb',
         },
       },
       boxShadow: {
-        card: '0 24px 60px rgba(18, 33, 23, 0.14)',
-      },
-      backgroundImage: {
-        grain:
-          "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.55) 0, transparent 28%), radial-gradient(circle at 80% 0%, rgba(201,111,66,0.18) 0, transparent 24%), linear-gradient(160deg, #f7f2e8 0%, #ebe4d5 100%)",
+        card: '0 2px 8px rgba(0, 0, 0, 0.08)',
+        'card-lg': '0 8px 24px rgba(0, 0, 0, 0.12)',
       },
       fontFamily: {
-        sans: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
       },
     },
   },
