@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { whatsappScenes } from '@/lib/mock-data'
+import { WhatsAppJourney } from '@/components/whatsapp-journey'
 
 export default function WhatsAppJourneyPage() {
   return (
@@ -28,38 +28,7 @@ export default function WhatsAppJourneyPage() {
           </div>
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-          {whatsappScenes.map((scene) => (
-            <article
-              key={scene.title}
-              className="rounded-[2rem] border border-white/70 bg-[#efe7db] p-4 shadow-card"
-            >
-              <div className="rounded-[1.5rem] bg-[#0b5f4f] px-4 py-3 text-white">
-                <p className="text-sm font-medium">{scene.title}</p>
-                <p className="text-xs text-white/75">{scene.subtitle}</p>
-              </div>
-
-              <div className="space-y-3 px-1 py-4 text-sm">
-                {scene.messages.map((message) => (
-                  <div
-                    key={`${scene.title}-${message.text}`}
-                    className={message.side === 'customer' ? 'flex justify-end' : 'flex justify-start'}
-                  >
-                    <div
-                      className={`max-w-[85%] rounded-[1.25rem] px-4 py-3 shadow-sm ${
-                        message.side === 'customer'
-                          ? 'rounded-br-md bg-[#dcf8c6]'
-                          : 'rounded-bl-md bg-white'
-                      }`}
-                    >
-                      {message.text}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </section>
+        <WhatsAppJourney />
       </div>
     </main>
   )
