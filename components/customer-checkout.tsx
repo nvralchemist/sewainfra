@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   CUSTOMER,
@@ -10,6 +10,7 @@ import {
   formatRp,
   paymentMethods,
 } from '@/lib/mock-data'
+import Modal from '@/components/modal'
 
 // ---------------------------------------------------------------------------
 // Component
@@ -19,15 +20,21 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
   const [selectedPayment, setSelectedPayment] = useState('qris')
   const [countdown, setCountdown] = useState(899) // 14:59
   const [isLoading, setIsLoading] = useState(false)
+  const [ktpUploaded, setKtpUploaded] = useState(false)
+  const [tncChecked, setTncChecked] = useState(false)
   const [selectedBank, setSelectedBank] = useState<string | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [showTncModal, setShowTncModal] = useState(false)
+
+  const ktpInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Countdown timer
+  // Countdown timer for QRIS
   useEffect(() => {
-    if (step !== 1 || countdown <= 0) return
+    if (step !== 1 || selectedPayment !== 'qris' || countdown <= 0) return
     const t = setInterval(() => setCountdown((c) => c - 1), 1000)
     return () => clearInterval(t)
-  }, [step, countdown])
+  }, [step, selectedPayment, countdown])
 
   const fmt = useCallback((s: number) => {
     const m = Math.floor(s / 60).toString().padStart(2, '0')
@@ -35,13 +42,24 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
     return `${m}:${sec}`
   }, [])
 
+  const canPay = ktpUploaded && tncChecked && selectedPayment
+
   const handlePay = () => {
+    if (!canPay) return
     setIsLoading(true)
     setTimeout(() => {
       setIsLoading(false)
       setStep(2)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }, 2000)
+  }
+
+  const handleKtpUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setKtpUploaded(true)
+    }
+    e.target.value = ''
   }
 
   // -----------------------------------------------------------------------
@@ -91,11 +109,14 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
 
         {/* Actions */}
         <div className="mt-6 w-full space-y-3">
-          <button className="w-full rounded-xl border-2 border-sewain-primary py-3 text-sm font-semibold text-sewain-primary transition hover:bg-sewain-primary-light">
-            Lacak Status Order
-          </button>
           <Link
-            href="/wa"
+            href={`/dashboard/orders/${ORDER.id}`}
+            className="block w-full rounded-xl border-2 border-sewain-primary py-3 text-center text-sm font-semibold text-sewain-primary transition hover:bg-sewain-primary-light"
+          >
+            Lacak Status Order
+          </Link>
+          <Link
+            href="/wa-flow"
             className="block w-full rounded-xl bg-sewain-primary py-3 text-center text-sm font-semibold text-white transition hover:bg-sewain-primary-dark"
           >
             Kembali ke WhatsApp
@@ -110,7 +131,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
   // -----------------------------------------------------------------------
   return (
     <div className="relative scroll-smooth pb-36">
-      {/* ── Progress Bar ────────────────────────────────────── */}
+      {/* -- Progress Bar -- */}
       <div className="sticky top-0 z-20 border-b border-sewain-border bg-white/95 backdrop-blur">
         <div className="flex items-center justify-between px-5 py-3 text-xs">
           {['Verifikasi', 'Pembayaran', 'Konfirmasi'].map((label, i) => (
@@ -143,7 +164,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
         </div>
       </div>
 
-      {/* ── Trust Bar ───────────────────────────────────────── */}
+      {/* -- Trust Bar -- */}
       <div className="border-b border-sewain-border bg-sewain-primary-light px-5 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -159,7 +180,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
       </div>
 
       <div className="space-y-4 px-4 pt-4">
-        {/* ── Merchant Identity Card ────────────────────────── */}
+        {/* -- Merchant Identity Card -- */}
         <div className="rounded-xl border border-sewain-border bg-white p-4 shadow-card">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-purple-600 text-sm font-bold text-white">
@@ -181,7 +202,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
           </div>
         </div>
 
-        {/* ── Order Details Card ────────────────────────────── */}
+        {/* -- Order Details Card -- */}
         <div className="rounded-xl border border-sewain-border bg-white p-4 shadow-card">
           <p className="text-xs font-medium uppercase tracking-wider text-sewain-text-secondary">
             Detail Pesanan
@@ -200,7 +221,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
           </div>
         </div>
 
-        {/* ── KYC Section ───────────────────────────────────── */}
+        {/* -- KYC Section -- */}
         <div className="rounded-xl border border-sewain-border bg-white p-4 shadow-card">
           <p className="font-semibold text-sewain-text-primary">
             Verifikasi Identitas
@@ -229,16 +250,33 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
                 className="mt-1 w-full rounded-lg border border-sewain-border bg-sewain-bg px-3 py-2.5 text-sm text-sewain-text-primary outline-none focus:border-sewain-primary focus:ring-1 focus:ring-sewain-primary"
               />
             </div>
-            <button className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sewain-border bg-sewain-bg py-3 text-sm text-sewain-text-secondary transition hover:border-sewain-primary hover:text-sewain-primary">
-              {'\uD83D\uDCF7'} Upload Foto KTP
-            </button>
+            {/* KTP Upload */}
+            <input
+              ref={ktpInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleKtpUpload}
+              className="hidden"
+            />
+            {ktpUploaded ? (
+              <div className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-green-300 bg-green-50 py-3 text-sm text-green-700 font-medium">
+                {'\u2713'} KTP terupload
+              </div>
+            ) : (
+              <button
+                onClick={() => ktpInputRef.current?.click()}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sewain-border bg-sewain-bg py-3 text-sm text-sewain-text-secondary transition hover:border-sewain-primary hover:text-sewain-primary"
+              >
+                {'\uD83D\uDCF7'} Upload Foto KTP
+              </button>
+            )}
           </div>
           <p className="mt-3 text-[11px] leading-relaxed text-sewain-text-secondary">
             {'\uD83D\uDD12'} Data kamu aman dan hanya digunakan untuk verifikasi transaksi ini
           </p>
         </div>
 
-        {/* ── Payment Breakdown Card ────────────────────────── */}
+        {/* -- Payment Breakdown Card -- */}
         <div className="rounded-xl border border-sewain-border bg-white p-4 shadow-card">
           <p className="text-xs font-medium uppercase tracking-wider text-sewain-text-secondary">
             Rincian Pembayaran
@@ -272,7 +310,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
           </div>
         </div>
 
-        {/* ── Payment Method Selector ───────────────────────── */}
+        {/* -- Payment Method Selector -- */}
         <div className="rounded-xl border border-sewain-border bg-white p-4 shadow-card">
           <p className="font-semibold text-sewain-text-primary">
             Pilih Metode Pembayaran
@@ -318,7 +356,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
             ))}
           </div>
 
-          {/* ── QRIS expanded ──────────────────────────────── */}
+          {/* -- QRIS expanded -- */}
           {selectedPayment === 'qris' && (
             <div className="mt-4 rounded-lg border border-sewain-border bg-sewain-bg p-4 text-center">
               {/* QR placeholder */}
@@ -345,7 +383,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
             </div>
           )}
 
-          {/* ── GoPay / OVO / ShopeePay expanded ──────────── */}
+          {/* -- GoPay / OVO / ShopeePay expanded -- */}
           {(selectedPayment === 'gopay' ||
             selectedPayment === 'ovo' ||
             selectedPayment === 'shopeepay') && (
@@ -366,7 +404,7 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
             </div>
           )}
 
-          {/* ── Transfer Bank expanded ─────────────────────── */}
+          {/* -- Transfer Bank expanded -- */}
           {selectedPayment === 'bank' && (
             <div className="mt-4 space-y-2">
               {['BCA', 'BNI', 'BRI'].map((bank) => (
@@ -391,12 +429,46 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
                   </span>
                 </button>
               ))}
+              {selectedBank && (
+                <div className="mt-3 rounded-lg border border-sewain-border bg-sewain-bg p-4">
+                  <p className="text-xs font-medium text-sewain-text-secondary mb-2">Detail Transfer</p>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-sewain-text-secondary">Bank</span>
+                      <span className="font-medium text-sewain-text-primary">{selectedBank}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sewain-text-secondary">No. Rekening</span>
+                      <span className="font-mono font-medium text-sewain-text-primary">1234567890</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sewain-text-secondary">a.n.</span>
+                      <span className="font-medium text-sewain-text-primary">Sewain Indonesia</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sewain-text-secondary">Jumlah</span>
+                      <span className="font-bold text-sewain-primary">{formatRp(ORDER.total)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── T&C ───────────────────────────────────────────── */}
-        <div className="px-1 pb-2">
+        {/* -- T&C -- */}
+        <div className="px-1 pb-2 space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={tncChecked}
+              onChange={(e) => setTncChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-sewain-primary focus:ring-sewain-primary accent-sewain-primary"
+            />
+            <span className="text-sm text-sewain-text-primary">
+              Saya menyetujui Syarat &amp; Ketentuan
+            </span>
+          </label>
           <p className="text-[11px] leading-relaxed text-sewain-text-secondary">
             Dengan melanjutkan pembayaran, kamu menyetujui{' '}
             <span className="text-sewain-primary underline underline-offset-2 cursor-pointer">
@@ -407,19 +479,26 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
               Kebijakan Privasi
             </span>{' '}
             Sewain.{' '}
-            <span className="text-sewain-primary underline underline-offset-2 cursor-pointer">
+            <button
+              onClick={() => setShowTncModal(true)}
+              className="text-sewain-primary underline underline-offset-2 cursor-pointer"
+            >
               Baca S&amp;K lengkap
-            </span>
+            </button>
           </p>
         </div>
       </div>
 
-      {/* ── Sticky Pay Button ───────────────────────────────── */}
+      {/* -- Sticky Pay Button -- */}
       <div ref={bottomRef} className="fixed bottom-0 left-1/2 z-30 w-full max-w-[390px] -translate-x-1/2 border-t border-sewain-border bg-white/95 px-4 pb-5 pt-3 backdrop-blur">
         <button
           onClick={handlePay}
-          disabled={isLoading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-sewain-primary py-3.5 text-sm font-bold text-white transition hover:bg-sewain-primary-dark disabled:opacity-70"
+          disabled={!canPay || isLoading}
+          className={`flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white transition ${
+            canPay
+              ? 'bg-sewain-primary hover:bg-sewain-primary-dark'
+              : 'bg-sewain-primary opacity-50 cursor-not-allowed'
+          } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           {isLoading ? (
             <>
@@ -452,6 +531,32 @@ export function CustomerCheckout({ bookingId }: { bookingId: string }) {
           {'\uD83D\uDD12'} Pembayaran aman dienkripsi
         </p>
       </div>
+
+      {/* -- T&C Modal -- */}
+      <Modal open={showTncModal} onClose={() => setShowTncModal(false)} title="Syarat & Ketentuan">
+        <div className="space-y-4 text-sm text-sewain-text-primary leading-relaxed">
+          <p>
+            Dengan menggunakan layanan Sewain, Anda menyetujui untuk terikat dengan syarat dan ketentuan berikut ini.
+            Sewain bertindak sebagai platform perantara yang menghubungkan penyewa (customer) dengan pemilik barang (merchant)
+            untuk memfasilitasi transaksi sewa-menyewa secara aman dan terpercaya.
+          </p>
+          <p>
+            Dana pembayaran yang Anda kirimkan akan disimpan dalam sistem escrow Sewain selama masa transaksi berlangsung.
+            Dana sewa akan dilepaskan kepada merchant setelah customer mengkonfirmasi penerimaan barang dalam kondisi baik.
+            Deposit akan dikembalikan secara otomatis setelah merchant mengkonfirmasi pengembalian barang dalam kondisi yang sesuai.
+          </p>
+          <p>
+            Apabila terjadi perselisihan (dispute) antara customer dan merchant, Sewain akan bertindak sebagai mediator
+            untuk menyelesaikan masalah secara adil. Kedua belah pihak wajib menyediakan bukti yang diperlukan dalam
+            jangka waktu yang ditentukan. Keputusan akhir dari tim Sewain bersifat mengikat bagi kedua belah pihak.
+          </p>
+          <p>
+            Customer wajib mengembalikan barang sewaan sesuai dengan jadwal yang telah disepakati. Keterlambatan pengembalian
+            dapat dikenakan denda sesuai kebijakan merchant. Kerusakan pada barang sewaan yang melebihi keausan normal akan
+            dipotong dari deposit customer sesuai penilaian merchant dan persetujuan tim Sewain.
+          </p>
+        </div>
+      </Modal>
     </div>
   )
 }

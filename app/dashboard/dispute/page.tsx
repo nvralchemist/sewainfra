@@ -1,10 +1,5 @@
-import DashboardLayout from '@/components/dashboard-layout'
-import DashboardDispute from '@/components/dashboard-dispute'
+import { redirect } from 'next/navigation'
 
-export default function DisputePage() {
-  return (
-    <DashboardLayout activeNav="dispute">
-      <DashboardDispute />
-    </DashboardLayout>
-  )
+export default function OldDisputePage() {
+  redirect('/dashboard/disputes')
 }

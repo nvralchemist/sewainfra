@@ -110,7 +110,9 @@ export default function DashboardLayout({ children, activeNav }: DashboardLayout
           <div className="flex items-center gap-4">
             <button className="relative">
               <Bell size={20} className="text-sewain-text-secondary" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-sewain-red rounded-full" />
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-sewain-red rounded-full text-[10px] font-bold text-white flex items-center justify-center">
+                3
+              </span>
             </button>
             <div className="w-9 h-9 rounded-full bg-sewain-primary flex items-center justify-center text-white text-sm font-bold">
               {MERCHANT.initials}

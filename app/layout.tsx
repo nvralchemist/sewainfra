@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import { ToastProvider } from '@/components/toast'
 
 export const metadata: Metadata = {
   title: 'Sewain — Infrastruktur Transaksi Rental',
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="id">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   )
 }

@@ -1,27 +1,67 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   ShoppingBag,
   TrendingUp,
   AlertTriangle,
   Landmark,
+  Plus,
 } from 'lucide-react'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 import {
   dashboardStats,
   returnAlerts,
-  recentOrders,
   gmvChartData,
+  orders as initialOrders,
+  getCustomer,
+  formatRp,
+  statusLabels,
+  statusColors,
+  riskColors,
+  riskLabels,
+  customers,
+  type Order,
+  type OrderStatus,
 } from '@/lib/mock-data'
+import Modal from '@/components/modal'
+import { useToast } from '@/components/toast'
+
+const RechartsLine = dynamic(
+  () =>
+    import('recharts').then((mod) => {
+      const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = mod
+      return function GMVChart() {
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={gmvChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="#6b7280" />
+              <YAxis
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
+                tickFormatter={(v: number) => `${(v / 1000000).toFixed(1)}M`}
+              />
+              <Tooltip
+                formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'GMV']}
+                labelFormatter={(label) => `Hari ke-${label}`}
+              />
+              <Line
+                type="monotone"
+                dataKey="gmv"
+                stroke="#1D9E75"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )
+      }
+    }),
+  { ssr: false, loading: () => <div className="h-64 flex items-center justify-center text-sm text-gray-400">Memuat chart...</div> }
+)
 
 const statIcons = [
   <ShoppingBag key="0" size={24} className="text-sewain-primary" />,
@@ -30,21 +70,97 @@ const statIcons = [
   <Landmark key="3" size={24} className="text-sewain-text-secondary" />,
 ]
 
-const riskColor: Record<string, string> = {
-  rendah: 'bg-green-500',
-  sedang: 'bg-yellow-500',
-  tinggi: 'bg-red-500',
-}
-
-const statusColor: Record<string, string> = {
-  Aktif: 'bg-green-100 text-green-700',
-  'Menunggu Bayar': 'bg-yellow-100 text-yellow-700',
-  Dikembalikan: 'bg-blue-100 text-blue-700',
-  Baru: 'bg-gray-100 text-gray-700',
-  Dispute: 'bg-red-100 text-red-700',
+function buildWaLink(phone: string, message: string) {
+  const cleaned = phone.replace(/\s+/g, '').replace('+', '')
+  return `https://wa.me/${cleaned}?text=${encodeURIComponent(message)}`
 }
 
 export default function DashboardHome() {
+  const { showToast } = useToast()
+  const [localOrders, setLocalOrders] = useState<Order[]>([...initialOrders])
+
+  // Modal state
+  const [reminderModal, setReminderModal] = useState<{ open: boolean; message: string; phone: string; title: string }>({
+    open: false,
+    message: '',
+    phone: '',
+    title: '',
+  })
+  const [selesaiModal, setSelesaiModal] = useState<{ open: boolean; orderId: string }>({
+    open: false,
+    orderId: '',
+  })
+
+  // --- Return Alert reminder ---
+  function openAlertReminder(alert: (typeof returnAlerts)[number]) {
+    const customer = customers.find((c) => c.id === alert.customerId)
+    const phone = customer?.phone || ''
+    const message = `Halo kak ${alert.customer}! Ini pengingat bahwa item "${alert.item}" sudah ${alert.label.toLowerCase()}. Mohon segera dikembalikan ya kak. Terima kasih!`
+    setReminderModal({ open: true, message, phone, title: 'Kirim Reminder WhatsApp' })
+  }
+
+  // --- Order action: Ingatkan (menunggu_bayar) ---
+  function openPaymentReminder(order: Order) {
+    const customer = getCustomer(order.customerId)
+    const phone = customer?.phone || ''
+    const total = order.sewa + order.deposit
+    const message = `Halo kak ${customer?.name || ''}! Ini pengingat untuk menyelesaikan pembayaran order ${order.id}.\n\nItem: ${order.item}\nTotal: ${formatRp(total)}\n\nMohon segera diselesaikan ya kak. Terima kasih!`
+    setReminderModal({ open: true, message, phone, title: 'Ingatkan Pembayaran' })
+  }
+
+  // --- Order action: Selesai (dikembalikan) ---
+  function openSelesaiConfirm(orderId: string) {
+    setSelesaiModal({ open: true, orderId })
+  }
+
+  function confirmSelesai() {
+    setLocalOrders((prev) =>
+      prev.map((o) => (o.id === selesaiModal.orderId ? { ...o, status: 'selesai' as OrderStatus } : o))
+    )
+    setSelesaiModal({ open: false, orderId: '' })
+    showToast('Order berhasil diselesaikan')
+  }
+
+  // --- Render action button per order ---
+  function renderAction(order: Order) {
+    switch (order.status) {
+      case 'aktif':
+        return (
+          <Link href={`/dashboard/orders/${order.id}`} className="text-sewain-primary text-sm font-medium hover:underline">
+            Detail
+          </Link>
+        )
+      case 'menunggu_bayar':
+        return (
+          <button onClick={() => openPaymentReminder(order)} className="text-sewain-primary text-sm font-medium hover:underline">
+            Ingatkan
+          </button>
+        )
+      case 'dikembalikan':
+        return (
+          <button onClick={() => openSelesaiConfirm(order.id)} className="text-sewain-primary text-sm font-medium hover:underline">
+            Selesai
+          </button>
+        )
+      case 'baru':
+        return (
+          <Link href="/dashboard/orders/new" className="text-sewain-primary text-sm font-medium hover:underline">
+            Buat Order
+          </Link>
+        )
+      case 'dispute':
+        return (
+          <Link href={`/dashboard/disputes/${order.id}`} className="text-sewain-primary text-sm font-medium hover:underline">
+            Lihat
+          </Link>
+        )
+      case 'selesai':
+        return <span className="text-sm text-gray-400">Selesai</span>
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Stats Row */}
@@ -68,7 +184,7 @@ export default function DashboardHome() {
       {/* Return Alerts */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-sewain-text-primary">
-          ⚠️ Perlu Perhatian
+          Perlu Perhatian
         </h2>
         {returnAlerts.map((alert) => (
           <div
@@ -93,7 +209,10 @@ export default function DashboardHome() {
                 {alert.label}
               </span>
             </div>
-            <button className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg border border-sewain-primary text-sewain-primary hover:bg-sewain-primary-light transition-colors">
+            <button
+              onClick={() => openAlertReminder(alert)}
+              className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg border border-sewain-primary text-sewain-primary hover:bg-sewain-primary-light transition-colors"
+            >
               Kirim Reminder
             </button>
           </div>
@@ -102,8 +221,15 @@ export default function DashboardHome() {
 
       {/* Recent Orders */}
       <div className="bg-white rounded-xl shadow-card overflow-hidden">
-        <div className="p-5 border-b border-sewain-border">
+        <div className="p-5 border-b border-sewain-border flex items-center justify-between">
           <h2 className="text-lg font-semibold text-sewain-text-primary">Order Terbaru</h2>
+          <Link
+            href="/dashboard/orders/new"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-sewain-primary text-white hover:bg-sewain-primary-dark transition-colors"
+          >
+            <Plus size={16} />
+            Buat Order Baru
+          </Link>
         </div>
 
         {/* Desktop table */}
@@ -121,72 +247,74 @@ export default function DashboardHome() {
               </tr>
             </thead>
             <tbody className="divide-y divide-sewain-border">
-              {recentOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 font-medium text-sewain-text-primary">
-                    {order.customer}
-                  </td>
-                  <td className="px-5 py-3 text-sewain-text-secondary">{order.item}</td>
-                  <td className="px-5 py-3 text-sewain-text-secondary">{order.period}</td>
-                  <td className="px-5 py-3 text-sewain-text-primary font-medium">
-                    {order.total}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className="flex items-center gap-1.5 text-sewain-text-secondary capitalize">
-                      <span className={`w-2.5 h-2.5 rounded-full ${riskColor[order.risk]}`} />
-                      {order.risk}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
-                        statusColor[order.status] || 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <button className="text-sewain-primary text-sm font-medium hover:underline">
-                      {order.action}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {localOrders.map((order) => {
+                const customer = getCustomer(order.customerId)
+                const total = order.sewa + order.deposit
+                return (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-5 py-3 font-medium text-sewain-text-primary">
+                      {customer?.name || '-'}
+                    </td>
+                    <td className="px-5 py-3 text-sewain-text-secondary">{order.item}</td>
+                    <td className="px-5 py-3 text-sewain-text-secondary">
+                      {order.start} – {order.end}
+                    </td>
+                    <td className="px-5 py-3 text-sewain-text-primary font-medium">
+                      {formatRp(total)}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="flex items-center gap-1.5 text-sewain-text-secondary capitalize">
+                        <span className={`w-2.5 h-2.5 rounded-full ${riskColors[customer?.risk || 'rendah']}`} />
+                        {riskLabels[customer?.risk || 'rendah']}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}
+                      >
+                        {statusLabels[order.status]}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      {renderAction(order)}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Mobile cards */}
         <div className="md:hidden divide-y divide-sewain-border">
-          {recentOrders.map((order) => (
-            <div key={order.id} className="p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sewain-text-primary">{order.customer}</span>
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                    statusColor[order.status] || 'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  {order.status}
-                </span>
+          {localOrders.map((order) => {
+            const customer = getCustomer(order.customerId)
+            const total = order.sewa + order.deposit
+            return (
+              <div key={order.id} className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sewain-text-primary">{customer?.name || '-'}</span>
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}
+                  >
+                    {statusLabels[order.status]}
+                  </span>
+                </div>
+                <p className="text-sm text-sewain-text-secondary">{order.item}</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-sewain-text-secondary">{order.start} – {order.end}</span>
+                  <span className="font-medium text-sewain-text-primary">{formatRp(total)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs text-sewain-text-secondary capitalize">
+                    <span className={`w-2 h-2 rounded-full ${riskColors[customer?.risk || 'rendah']}`} />
+                    {riskLabels[customer?.risk || 'rendah']}
+                  </span>
+                  {renderAction(order)}
+                </div>
               </div>
-              <p className="text-sm text-sewain-text-secondary">{order.item}</p>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-sewain-text-secondary">{order.period}</span>
-                <span className="font-medium text-sewain-text-primary">{order.total}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-xs text-sewain-text-secondary capitalize">
-                  <span className={`w-2 h-2 rounded-full ${riskColor[order.risk]}`} />
-                  {order.risk}
-                </span>
-                <button className="text-sewain-primary text-sm font-medium hover:underline">
-                  {order.action}
-                </button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -196,31 +324,53 @@ export default function DashboardHome() {
           GMV 30 Hari Terakhir
         </h2>
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={gmvChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="#6b7280" />
-              <YAxis
-                tick={{ fontSize: 12 }}
-                stroke="#6b7280"
-                tickFormatter={(v: number) => `${(v / 1000000).toFixed(1)}M`}
-              />
-              <Tooltip
-                formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'GMV']}
-                labelFormatter={(label) => `Hari ke-${label}`}
-              />
-              <Line
-                type="monotone"
-                dataKey="gmv"
-                stroke="#1D9E75"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <RechartsLine />
         </div>
       </div>
+
+      {/* Reminder Modal */}
+      <Modal open={reminderModal.open} onClose={() => setReminderModal((s) => ({ ...s, open: false }))} title={reminderModal.title}>
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-sm text-sewain-text-secondary whitespace-pre-wrap">{reminderModal.message}</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.open(buildWaLink(reminderModal.phone, reminderModal.message), '_blank')}
+              className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-sewain-primary text-white hover:bg-sewain-primary-dark transition-colors"
+            >
+              Buka WhatsApp
+            </button>
+            <button
+              onClick={() => setReminderModal((s) => ({ ...s, open: false }))}
+              className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-sewain-border text-sewain-text-secondary hover:bg-gray-50 transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Selesai Confirmation Modal */}
+      <Modal open={selesaiModal.open} onClose={() => setSelesaiModal({ open: false, orderId: '' })} title="Konfirmasi Selesai">
+        <div className="space-y-4">
+          <p className="text-sm text-sewain-text-secondary">Tandai order ini sebagai selesai?</p>
+          <div className="flex gap-3">
+            <button
+              onClick={confirmSelesai}
+              className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg bg-sewain-primary text-white hover:bg-sewain-primary-dark transition-colors"
+            >
+              Konfirmasi
+            </button>
+            <button
+              onClick={() => setSelesaiModal({ open: false, orderId: '' })}
+              className="flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border border-sewain-border text-sewain-text-secondary hover:bg-gray-50 transition-colors"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

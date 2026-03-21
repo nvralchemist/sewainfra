@@ -150,16 +150,6 @@ Kak Rina, hari ini (14 Apr) adalah batas waktu pengembalian gaun.
 Mohon segera kirim barang dan share resi ke merchant ya kak supaya deposit kamu bisa segera dikembalikan 🙏
 ```
 
-#### Screen 1C — Merchant Quick Send shortcuts panel
-Show a bottom sheet / modal overlay on the merchant's WA chat screen with quick send shortcuts:
-
-Show 3 buttons:
-1. **Kirim Link Pembayaran** — tapping shows preview of pre-filled message and "Buka WhatsApp" button
-2. **Kirim Pengingat Kembali** — shows return reminder template
-3. **Kirim Ringkasan Order** — shows order summary template
-
-Each button shows the pre-filled message text in a preview card before opening WA.
-
 ### UX details
 - WA header: contact avatar circle with initials, name, "online" status, back arrow, call/video icons
 - Message timestamps visible on each bubble
@@ -167,6 +157,7 @@ Each button shows the pre-filled message text in a preview card before opening W
 - Typing indicator (three animated dots) during scoring
 - System notifications styled differently — centered, rounded pill, blue background, smaller text
 - Sewain system messages have a small Sewain logo/badge
+- **No Quick Send shortcuts in the WA chat view** — WA screens are read-only simulations of WhatsApp. Quick Send lives exclusively in the Merchant Dashboard (see Prototype 3).
 
 ---
 
@@ -374,9 +365,22 @@ White card with red left border showing:
 **Chat messages below the risk card:**
 Show 4-5 messages in WA style.
 
-**Bottom bar:**
-- Quick Send shortcuts: [Link Bayar] [Reminder Kembali] [Ringkasan Order]
-- Message input
+**Quick Send panel (right sidebar, above risk profile card):**
+This is where Quick Send shortcuts live — accessible only from the Merchant Dashboard chat view, NOT from WhatsApp itself. The merchant taps a shortcut here, sees a preview of the pre-filled WA message, then taps "Buka di WhatsApp" which opens WhatsApp with the message ready to send.
+
+Show 3 shortcut buttons:
+1. **Kirim Link Pembayaran** — pre-fills: "Kak [Nama], ini link pembayaran untuk sewa [Item] ya 🙏 [link] — Powered by sewain.id"
+2. **Kirim Pengingat Kembali** — pre-fills: "Halo kak [Nama], reminder pengembalian [Item] ya kak, due date: [Tanggal] 🙏 Deposit akan otomatis dikembalikan setelah merchant konfirmasi."
+3. **Kirim Ringkasan Order** — pre-fills full order recap with item, dates, amounts
+
+Each shortcut:
+- Shows a preview card with the message text
+- Has a green "Buka di WhatsApp ↗" button that simulates opening WA deep link
+- Has a "Salin Pesan" secondary button
+
+**Bottom bar (chat input area):**
+- Simple message input field (for reference only — actual messaging happens in WhatsApp)
+- Note label: "Pesan dikirim melalui WhatsApp"
 
 ---
 
@@ -418,8 +422,11 @@ Two-column form layout:
 Show success state with:
 - Generated link: "sewain.id/pay/TRX-20250412-CEA-001"
 - Copy link button
-- "Kirim via WhatsApp" button
-- Pre-filled WA message preview:
+- **Quick Send shortcuts panel** (this is the primary way merchant sends the link — NOT from WhatsApp):
+  - Button: "Kirim Link Bayar via WA ↗" — opens WhatsApp with pre-filled message
+  - Button: "Kirim Ringkasan Order via WA ↗" — opens WhatsApp with order recap
+  - Button: "Salin Link" — copies to clipboard
+- Pre-filled WA message preview shown before opening WA:
 ```
 Halo kak Rina! Ini link pembayaran untuk sewa Gaun Pesta Merah ya 🙏
 
@@ -428,6 +435,7 @@ sewain.id/pay/TRX-20250412-CEA-001
 Total: Rp 550.000 (termasuk deposit Rp 200.000)
 — Powered by sewain.id
 ```
+- Note: "Quick Send membuka WhatsApp dengan pesan siap kirim — merchant cukup tap Send"
 
 ---
 
@@ -500,31 +508,185 @@ Rp 750.000 ditahan dalam escrow selama proses dispute berlangsung.
 
 ## Global requirements
 
-### Navigation
-- All pages navigable from each other
-- Breadcrumb or top nav showing current page
-- Back buttons where appropriate
+---
 
-### Interactivity
-- All buttons have hover/active states
-- Form inputs are functional
-- Modals/overlays open and close
-- Payment method selector switches between options
-- Timeline steps feel like real progress indicators
-- Countdown timer on QRIS actually counts down
+### Routing — CRITICAL
+
+Use React Router v6. Every page must have its own route. No page should ever return 404.
+
+```
+/                          → redirect to /dashboard
+/dashboard                 → Dashboard home (stats + order table)
+/dashboard/chat            → Chat & Risiko tab
+/dashboard/chat/:customerId → Open specific chat
+/dashboard/orders          → All orders list
+/dashboard/orders/new      → Create new order
+/dashboard/orders/:orderId → Order detail & tracking
+/dashboard/disputes        → All disputes
+/dashboard/disputes/:id    → Dispute detail
+/wa-flow                   → WA Chat prototype (merchant view)
+/wa-flow/notifications     → WA notifications (customer view)
+/checkout                  → Customer checkout page
+```
+
+Add a `vercel.json` at the project root:
+```json
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+```
+
+**All sidebar nav links must use React Router `<Link>` or `useNavigate()` — never `<a href>` tags for internal navigation.**
+
+---
+
+### Interactivity — ALL buttons must work
+
+Every single button, link, and interactive element must have a defined behavior. Nothing should be a dead end. Here is the complete list:
+
+#### Dashboard home buttons:
+- **[+ Buat Order Baru]** → navigate to `/dashboard/orders/new`
+- **[Detail]** on any order row → navigate to `/dashboard/orders/:orderId`
+- **[Ingatkan]** on any order row → open a modal showing pre-filled WA reminder message with "Buka WhatsApp ↗" and "Tutup" buttons
+- **[Selesai]** on completed order → open confirmation modal: "Tandai order ini sebagai selesai?" with [Konfirmasi] and [Batal] buttons. On confirm, update order status in local state.
+- **[Buat Order]** on new customer row → navigate to `/dashboard/orders/new` with customer name pre-filled
+- **[Lihat]** on dispute row → navigate to `/dashboard/disputes/:id`
+- **[Kirim Reminder]** in return reminder section → open modal with WA message preview
+
+#### Chat tab buttons:
+- **Clicking any chat row** → load that customer's chat in the right panel, mark as read (remove unread dot)
+- **[Lihat Detail Profil]** → expand/collapse the risk profile card (toggle)
+- **[Tetap Lanjut]** on high risk card → dismiss the risk warning card, show green "Lanjut diproses" badge
+- **[Tolak Customer]** on high risk card → show modal "Yakin tolak customer ini? Mereka tidak akan bisa melanjutkan transaksi." with [Tolak] and [Batal]. On confirm, show "Customer ditolak" state.
+- **[Kirim Link Pembayaran]** Quick Send → show message preview modal with "Buka WhatsApp ↗" and "Salin Pesan" buttons
+- **[Kirim Pengingat Kembali]** Quick Send → show message preview modal
+- **[Kirim Ringkasan Order]** Quick Send → show message preview modal
+- **[Buka WhatsApp ↗]** in any Quick Send modal → simulate opening with `window.open('https://wa.me/?text=...', '_blank')` using pre-filled message
+- **[Salin Pesan]** → copy message to clipboard, show "Tersalin! ✓" toast
+
+#### Order creation buttons:
+- **Date range inputs** → functional date pickers. When both dates are selected, auto-calculate and display duration in days
+- **Harga Sewa / Deposit inputs** → on change, auto-calculate Total in real time
+- **KYC toggle** → toggles a "KYC wajib" badge on the order summary
+- **[Simpan Draft]** → save order to local state, show toast "Draft tersimpan", navigate to `/dashboard/orders` with draft visible
+- **[Generate Link Pembayaran]** → validate all fields first. If empty, show inline validation errors in red. If valid, show success state with generated link
+- **[Kirim Link Bayar via WA ↗]** → open `window.open('https://wa.me/+628123456789?text=...', '_blank')`
+- **[Kirim Ringkasan Order via WA ↗]** → open WA with order recap message
+- **[Salin Link]** → copy link to clipboard, show "Link tersalin! ✓" toast notification
+
+#### Order detail buttons:
+- **[Input Resi Pengiriman]** → open inline form with resi number input and courier dropdown (JNE, JNT, SiCepat, Anteraja, GoSend). On submit, update timeline step 2 to show resi and "Lacak ↗" link
+- **[Lacak ↗]** → open `window.open('https://cekresi.com/?noresi=JX123456789', '_blank')`
+- **[Ingatkan]** on timeline step 3 → show WA message preview modal, then open WA
+- **[Konfirmasi Item Kembali]** → open modal: "Konfirmasi item sudah kembali dalam kondisi baik?" with condition options: [Baik] [Ada Kerusakan Minor] [Rusak]. On selecting "Baik" → update timeline, trigger deposit refund animation, show success toast "Deposit Rp 200.000 sedang dikembalikan ke customer". On selecting damage options → redirect to open dispute flow.
+- **[Buka Dispute]** → navigate to dispute creation flow at `/dashboard/disputes/new` with order ID pre-filled
+- **[Kirim Reminder ke Customer]** → open modal with WA message template, "Buka WhatsApp ↗" button
+
+#### Dispute view buttons:
+- **[+ Tambah Bukti]** → open file upload modal. On "upload" (simulate with any file selection), add a thumbnail to the evidence grid
+- **[Buka WA Group ↗]** → open `window.open('https://wa.me/...', '_blank')`
+
+#### Checkout page buttons:
+- **Payment method radio buttons** → selecting each one shows different UI:
+  - QRIS: show QR placeholder + countdown timer (starts at 15:00, counts down every second using setInterval)
+  - GoPay/OVO/ShopeePay: show phone number input field
+  - Transfer Bank: show bank account details (BCA: 1234567890 a.n. Sewain Indonesia)
+- **[Upload Foto KTP]** → simulate file picker. On file selected, show thumbnail + "✓ KTP terupload" badge
+- **TnC checkbox** → must be checked before pay button is enabled
+- **[Bayar Sekarang — Rp 550.000]** → disabled until: KTP uploaded + TnC checked + payment method selected. On click, show loading spinner for 2 seconds, then show full-screen success state
+- **Success state [Lihat Status Order]** → navigate to a simple order status page showing the timeline from the customer's perspective
+- **[Baca S&K lengkap]** → open a modal with full TnC text in Bahasa Indonesia (3-4 paragraphs)
+
+#### WA Flow buttons:
+- **Tab switcher** between "Merchant View" and "Customer Notifications" → switches the visible screen
+- **[Play / Replay flow]** button → replays the chat animation from the beginning
+- **[Quick Send ↗]** shortcut button in merchant view → opens a bottom sheet showing the 3 shortcut options
+
+---
+
+### Form validation
+
+All forms must validate before submission:
+- Empty required fields → show red border + error message below field
+- Invalid phone format → "Format nomor tidak valid. Gunakan format +62xxx"
+- Invalid date range (end before start) → "Tanggal kembali harus setelah tanggal mulai"
+- Zero or negative amounts → "Nominal harus lebih dari Rp 0"
+
+---
+
+### Toast notifications
+
+Use a simple toast system (bottom of screen, auto-dismiss after 3 seconds) for:
+- "Link tersalin! ✓" — green
+- "Draft tersimpan" — green
+- "Pesan tersalin! ✓" — green
+- "Order berhasil dibuat" — green
+- "Customer ditolak" — red
+- Any error states — red
+
+---
+
+### Modal system
+
+All modals must:
+- Have a dark overlay behind them
+- Be closeable by clicking the overlay or pressing Escape
+- Have a clear [✕] close button
+- Not break page scroll
+
+---
+
+### Navigation
+
+- Sidebar nav items use React Router `<Link>` — active item highlighted with teal left border
+- **Back buttons** on all detail pages navigate to the parent list page using `useNavigate(-1)` or explicit path
+- **Breadcrumbs** on dashboard sub-pages: "Dashboard / Orders / TRX-20250412-CEA-001"
+- Top nav of dashboard shows: merchant name "CEA Atelier", notification bell with badge "3", avatar
+
+---
 
 ### Viewport
-- WA prototype: mobile only (390px max-width)
-- Checkout page: mobile only (390px max-width, centered on desktop)
-- Merchant dashboard: full desktop with responsive sidebar
 
-### Consistent data across all prototypes
-- Merchant: CEA Atelier, Jakarta Selatan, fashion rental
-- Customer: Rina Ayu, +62 812 3456 7890, @rinaayu_
-- Order: TRX-20250412-CEA-001
-- Item: Gaun Pesta Merah, Size M
-- Rental period: 12–14 April 2025
-- Sewa: Rp 350.000 | Deposit: Rp 200.000 | Total: Rp 550.000
+- WA prototype: mobile only (390px max-width, phone frame border)
+- Checkout page: mobile only (390px max-width, centered on desktop with phone frame)
+- Merchant dashboard: full desktop layout, sidebar 220px fixed, main content scrollable
+
+---
+
+### Consistent mock data
+
+Use this data consistently across all prototypes:
+
+```js
+// mockData.js
+export const merchant = {
+  name: "CEA Atelier",
+  location: "Jakarta Selatan",
+  category: "Fashion Rental",
+  plan: "Growth",
+  avatar: "CA"
+}
+
+export const customers = [
+  { id: "c1", name: "Rina Ayu", phone: "+62 812 3456 7890", instagram: "@rinaayu_", risk: "rendah", score: 12 },
+  { id: "c2", name: "Budi Wijaya", phone: "+62 813 9999 0001", instagram: "@budiwjy", risk: "tinggi", score: 72 },
+  { id: "c3", name: "Sari Putri", phone: "+62 856 1234 5678", instagram: "@sariputri_", risk: "sedang", score: 45 },
+  { id: "c4", name: "Dewi Nuraini", phone: "+62 878 5555 4444", instagram: "@dewinuraini", risk: "rendah", score: 18 },
+  { id: "c5", name: "Ahmad Fauzi", phone: "+62 821 7777 8888", instagram: "@ahmadfz", risk: "rendah", score: 20 }
+]
+
+export const orders = [
+  { id: "TRX-20250412-CEA-001", customerId: "c1", item: "Gaun Pesta Merah — Size M", start: "12 Apr 2025", end: "14 Apr 2025", sewa: 350000, deposit: 200000, status: "aktif", timeline: ["paid", "shipped", "pending_confirm", "", ""] },
+  { id: "TRX-20250413-CEA-002", customerId: "c2", item: "Jas Formal Hitam", start: "13 Apr 2025", end: "15 Apr 2025", sewa: 300000, deposit: 100000, status: "menunggu_bayar", timeline: ["", "", "", "", ""] },
+  { id: "TRX-20250410-CEA-003", customerId: "c3", item: "Kebaya Hijau", start: "10 Apr 2025", end: "12 Apr 2025", sewa: 200000, deposit: 100000, status: "dikembalikan", timeline: ["paid", "shipped", "confirmed", "returned", ""] },
+  { id: "TRX-20250415-CEA-004", customerId: "c4", item: "Gaun Cocktail Biru", start: "15 Apr 2025", end: "17 Apr 2025", sewa: 350000, deposit: 100000, status: "baru", timeline: ["", "", "", "", ""] },
+  { id: "TRX-20250408-CEA-005", customerId: "c5", item: "Jas Wedding Putih", start: "8 Apr 2025", end: "10 Apr 2025", sewa: 500000, deposit: 250000, status: "dispute", timeline: ["paid", "shipped", "confirmed", "returned", ""] }
+]
+```
+
+---
 
 ### Copy tone
 - Friendly, conversational Bahasa Indonesia
@@ -533,7 +695,7 @@ Rp 750.000 ditahan dalam escrow selama proses dispute berlangsung.
 - Trust-building language around escrow and deposit safety
 
 ### Empty states
-All list views have sensible empty state with icon and message.
+All list views must have a sensible empty state with an icon and descriptive message in Bahasa Indonesia.
 
 ### Loading states
-Show skeleton loaders or spinners where data would be fetched.
+Show skeleton loaders (gray animated rectangles) while data would load. For buttons that trigger async actions, show a spinner inside the button during the 2-second simulated delay.
